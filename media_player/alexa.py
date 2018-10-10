@@ -1,6 +1,5 @@
 """
 Support to interface with Alexa Devices.
-
 For more details about this platform, please refer to the documentation at
 https://community.home-assistant.io/t/echo-devices-alexa-as-media-player-testers-needed/58639
 VERSION 0.9.5
@@ -10,6 +9,7 @@ import logging
 from datetime import timedelta
 
 import requests
+import time
 import voluptuous as vol
 
 from homeassistant import util
@@ -49,8 +49,10 @@ ALEXA_DATA = "alexa_media"
 SERVICE_ALEXA_TTS = 'alexa_tts'
 
 ATTR_MESSAGE = 'message'
+ATTR_VOLUME = 'volume'
 ALEXA_TTS_SCHEMA = MEDIA_PLAYER_SCHEMA.extend({
     vol.Required(ATTR_MESSAGE): cv.string,
+    vol.Required(ATTR_VOLUME): cv.string
 })
 
 CONF_DEBUG = 'debug'
@@ -230,7 +232,8 @@ def setup_alexa(hass, config, add_devices_callback, login_obj):
                 for alexa in service_to_entities(call):
                     if call.service == SERVICE_ALEXA_TTS:
                         message = call.data.get(ATTR_MESSAGE)
-                        alexa.send_tts(message)
+                        volume = call.data.get(ATTR_VOLUME)
+                        alexa.send_tts(message, volume)
 
             def service_to_entities(call):
                 """Return the known devices that a service call mentions."""
@@ -496,9 +499,23 @@ class AlexaClient(MediaPlayerDevice):
 
     def set_volume_level(self, volume):
         """Set volume level, range 0..1."""
-        if not (self.state in [STATE_PLAYING, STATE_PAUSED]
-                and self.available):
+        
+        """Wake up the echo if in standby"""
+        if not (self.state in [STATE_PLAYING, STATE_PAUSED]):
+            if not (self.available):
+                return
+            self.play_media("AMAZON_MUSIC", "Blank (Silent Track)")
+            count = 1
+            while not (self.state in [STATE_PLAYING]):
+                time.sleep(.5)
+                count += 1
+                if (count > 40):
+                    break
+            self.alexa_api.set_volume(volume)
+            self._media_vol_level = volume
+            self.alexa_api.pause()
             return
+            
         self.alexa_api.set_volume(volume)
         self._media_vol_level = volume
 
@@ -516,7 +533,6 @@ class AlexaClient(MediaPlayerDevice):
 
     def mute_volume(self, mute):
         """Mute the volume.
-
         Since we can't actually mute, we'll:
         - On mute, store volume and set volume to 0
         - On unmute, set volume to previously stored volume
@@ -567,8 +583,9 @@ class AlexaClient(MediaPlayerDevice):
             return
         self.alexa_api.previous()
 
-    def send_tts(self, message):
+    def send_tts(self, message, volume):
         """Send TTS to Device NOTE: Does not work on WHA Groups."""
+        self.set_volume_level(float(volume))
         self.alexa_api.send_tts(message)
 
     def play_media(self, media_type, media_id, **kwargs):
@@ -651,7 +668,6 @@ class AlexaLogin():
 
     def test_loggedin(self, cookies=None):
         """Function that will test the connection is logged in.
-
         Attempts to get device list, and if unsuccessful login failed
         """
         if self._session is None:
