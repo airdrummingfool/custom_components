@@ -504,7 +504,7 @@ class AlexaClient(MediaPlayerDevice):
         if not (self.state in [STATE_PLAYING, STATE_PAUSED]):
             if not (self.available):
                 return
-            self.play_media("AMAZON_MUSIC", "Silence 5 Seconds")
+            self.play_media("AMAZON_MUSIC", "Blank Track 2 (Hidden Track)")
             count = 1
             while not (self.state in [STATE_PLAYING]):
                 time.sleep(.5)
