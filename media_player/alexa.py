@@ -52,7 +52,7 @@ ATTR_MESSAGE = 'message'
 ATTR_VOLUME = 'volume'
 ALEXA_TTS_SCHEMA = MEDIA_PLAYER_SCHEMA.extend({
     vol.Required(ATTR_MESSAGE): cv.string,
-    vol.Required(ATTR_VOLUME): cv.string
+    vol.Optional(ATTR_VOLUME): cv.string
 })
 
 CONF_DEBUG = 'debug'
@@ -232,7 +232,7 @@ def setup_alexa(hass, config, add_devices_callback, login_obj):
                 for alexa in service_to_entities(call):
                     if call.service == SERVICE_ALEXA_TTS:
                         message = call.data.get(ATTR_MESSAGE)
-                        volume = call.data.get(ATTR_VOLUME)
+                        volume = call.data.get(ATTR_VOLUME, None)
                         alexa.send_tts(message, volume)
 
             def service_to_entities(call):
@@ -583,9 +583,10 @@ class AlexaClient(MediaPlayerDevice):
             return
         self.alexa_api.previous()
 
-    def send_tts(self, message, volume):
+    def send_tts(self, message, volume=None):
         """Send TTS to Device NOTE: Does not work on WHA Groups."""
-        self.set_volume_level(float(volume))
+        if volume is not None:
+            self.set_volume_level(float(volume))
         self.alexa_api.send_tts(message)
 
     def play_media(self, media_type, media_id, **kwargs):
